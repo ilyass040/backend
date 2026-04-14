@@ -1,29 +1,26 @@
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 
 let pool;
 
 async function initPool() {
   if (pool) return pool;
 
-  const {
-    DB_HOST = 'localhost',
-    DB_USER = 'root',
-    DB_PASSWORD = '',
-    DB_NAME = 'location_films',
-  } = process.env;
+  // Pour Render (DATABASE_URL) ou pour le développement local
+  const connectionString = process.env.DATABASE_URL || `postgresql://${process.env.DB_USER || 'postgres'}:${process.env.DB_PASSWORD || ''}@${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 5432}/${process.env.DB_NAME || 'location_films'}`;
 
-  pool = mysql.createPool({
-    host: DB_HOST,
-    user: DB_USER,
-    password: DB_PASSWORD,
-    database: DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    namedPlaceholders: true,
+  pool = new Pool({
+    connectionString,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    // Pour les requêtes nommées style :userId (optionnel, mais garde la compatibilité)
+    allowExitOnIdle: true,
   });
 
   // Test connection (fail fast)
-  await pool.query('SELECT 1');
+  const client = await pool.connect();
+  await client.query('SELECT 1');
+  client.release();
+  
+  console.log('✅ PostgreSQL connected successfully');
   return pool;
 }
 
